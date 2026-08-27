@@ -1,5 +1,3 @@
-# backend/main.py
-
 from pathlib import Path
 import pickle
 from typing import Any
@@ -20,11 +18,11 @@ app = FastAPI(title="MovieVerse API")
 
 app.add_middleware(
     CORSMiddleware,
-   allow_origins=[
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "https://movie-verse-recommender.vercel.app"
-],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://movie-verse-recommender.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -85,16 +83,64 @@ def clean_genres(value) -> str:
 
         return value
 
-    if isinstance(
-        value,
-        (list, tuple, set, np.ndarray)
-    ):
+    if isinstance(value, (list, tuple, set, np.ndarray)):
         return ", ".join(
             str(x).strip()
             for x in value
         )
 
     return str(value)
+
+
+def clean_language(value) -> str:
+
+    if value is None:
+        return ""
+
+    code = str(value).strip().lower()
+
+    language_map = {
+        "en": "English",
+        "hi": "Hindi",
+        "es": "Spanish",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "fr": "French",
+        "de": "German",
+        "it": "Italian",
+        "pt": "Portuguese",
+        "zh": "Chinese",
+        "ru": "Russian",
+        "ar": "Arabic",
+        "tr": "Turkish",
+        "te": "Telugu",
+        "ta": "Tamil",
+        "ml": "Malayalam",
+        "bn": "Bengali",
+        "mr": "Marathi",
+        "pa": "Punjabi",
+        "th": "Thai",
+        "id": "Indonesian",
+        "nl": "Dutch",
+        "pl": "Polish",
+        "sv": "Swedish",
+        "da": "Danish",
+        "no": "Norwegian",
+        "fi": "Finnish",
+        "cs": "Czech",
+        "hu": "Hungarian",
+        "uk": "Ukrainian",
+        "fa": "Persian",
+        "he": "Hebrew",
+        "vi": "Vietnamese",
+        "ro": "Romanian",
+        "el": "Greek"
+    }
+
+    return language_map.get(
+        code,
+        code.upper()
+    )
 
 
 def poster_for(movie_id, title):
@@ -273,7 +319,7 @@ def movie_to_dict(row):
         "director": clean_text(
             data.get("director")
         ),
-        "language": clean_text(
+        "language": clean_language(
             data.get("language")
         ),
         "rating": rating,
@@ -482,4 +528,151 @@ def top_rated(
 
     return all_movies[
         :max(1, min(limit, 30))
+    ]
+
+
+@app.get("/discover")
+def discover(
+    mood: str = "",
+    genre: str = "",
+    rating: float = 0,
+    language: str = "",
+    year_from: int = 0,
+    year_to: int = 0,
+    exclude: str = ""
+):
+
+    all_movies = rows_as_list()
+
+    excluded_ids = set()
+
+    if exclude:
+
+        excluded_ids = {
+            x.strip()
+            for x in exclude.split(",")
+            if x.strip()
+        }
+
+    mood_map = {
+        "Happy": [
+            "Comedy",
+            "Adventure",
+            "Family",
+            "Animation"
+        ],
+        "Sad": [
+            "Drama",
+            "Romance"
+        ],
+        "Romantic": [
+            "Romance",
+            "Drama"
+        ],
+        "Excited": [
+            "Action",
+            "Adventure",
+            "Thriller"
+        ],
+        "Chill": [
+            "Comedy",
+            "Drama",
+            "Romance"
+        ],
+        "Thrilled": [
+            "Thriller",
+            "Horror",
+            "Mystery"
+        ],
+        "Thoughtful": [
+            "Drama",
+            "Mystery",
+            "Science Fiction"
+        ],
+        "Funny": [
+            "Comedy",
+            "Family"
+        ]
+    }
+
+    mood_genres = mood_map.get(
+        mood,
+        []
+    )
+
+    candidates = []
+
+    for movie in all_movies:
+
+        movie_id = str(
+            movie.get("id", "")
+        )
+
+        if movie_id in excluded_ids:
+            continue
+
+        movie_genres = str(
+            movie.get("genres", "")
+        ).lower()
+
+        movie_rating = float(
+            movie.get("rating", 0) or 0
+        )
+
+        movie_language = str(
+            movie.get("language", "")
+        ).lower()
+
+        movie_year = 0
+
+        try:
+            movie_year = int(
+                movie.get("year", 0) or 0
+            )
+        except Exception:
+            movie_year = 0
+
+        if rating and movie_rating < rating:
+            continue
+
+        if genre:
+            if genre.lower() not in movie_genres:
+                continue
+
+        if language:
+            if language.lower() not in movie_language:
+                continue
+
+        if year_from and movie_year < year_from:
+            continue
+
+        if year_to and movie_year > year_to:
+            continue
+
+        score = movie_rating
+
+        if mood_genres:
+
+            for mood_genre in mood_genres:
+
+                if (
+                    mood_genre.lower()
+                    in movie_genres
+                ):
+
+                    score += 2
+                    break
+
+        candidates.append(
+            (score, movie)
+        )
+
+    candidates.sort(
+        key=lambda x: x[0],
+        reverse=True
+    )
+
+    return [
+        movie
+        for _, movie in candidates
     ]
