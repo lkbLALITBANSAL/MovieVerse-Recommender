@@ -1,11 +1,12 @@
 import os
-import time
+import sys
 import pickle
 import requests
+import numpy as np
 import pandas as pd
 
 from dotenv import load_dotenv
-from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -15,9 +16,7 @@ load_dotenv()
 TOKEN = os.getenv("TMDB_TOKEN")
 
 if not TOKEN:
-    raise ValueError(
-        "TMDB_TOKEN is not set in .env"
-    )
+    raise ValueError("TMDB_TOKEN is not set in .env")
 
 
 HEADERS = {
@@ -36,72 +35,160 @@ DATA_DIR = os.path.join(
     "data"
 )
 
-os.makedirs(
+
+MOVIES_PATH = os.path.join(
     DATA_DIR,
-    exist_ok=True
+    "movies_API.pkl"
+)
+
+EMBEDDINGS_PATH = os.path.join(
+    DATA_DIR,
+    "embeddings_API.pkl"
+)
+
+SIMILARITY_PATH = os.path.join(
+    DATA_DIR,
+    "similarity_API.pkl"
+)
+
+POSTERS_PATH = os.path.join(
+    DATA_DIR,
+    "posters_API.pkl"
 )
 
 
-session = requests.Session()
+LANGUAGES = {
+    "hindi": "hi",
+    "tamil": "ta",
+    "telugu": "te",
+    "malayalam": "ml",
+    "kannada": "kn",
+    "bengali": "bn",
+    "marathi": "mr",
+    "punjabi": "pa",
+    "gujarati": "gu",
+    "odia": "or",
+    "assamese": "as",
+
+    "english": "en",
+    "korean": "ko",
+    "japanese": "ja",
+
+    "spanish": "es",
+    "french": "fr",
+    "german": "de",
+    "italian": "it",
+    "chinese": "zh",
+    "russian": "ru",
+    "portuguese": "pt",
+    "arabic": "ar",
+    "turkish": "tr"
+}
 
 
-def get_complete_movie(movie_id):
+def load_pickle(path, default=None):
 
-    url = (
-        f"https://api.themoviedb.org/3/movie/{movie_id}"
-        "?append_to_response=credits,keywords"
-    )
+    if not os.path.exists(path):
+        return default
 
-    try:
+    with open(path, "rb") as file:
+        return pickle.load(file)
 
-        response = session.get(
-            url,
-            headers=HEADERS,
-            timeout=30
+
+def save_pickle(path, data):
+
+    with open(path, "wb") as file:
+        pickle.dump(data, file)
+
+
+def get_language():
+
+    if len(sys.argv) < 2:
+
+        print("\nUsage:")
+        print(
+            "python update_data.py hindi"
+        )
+        print(
+            "python update_data.py tamil"
+        )
+        print(
+            "python update_data.py english"
+        )
+        print(
+            "python update_data.py korean"
+        )
+        print(
+            "python update_data.py japanese"
         )
 
-        if response.status_code != 200:
-            print(
-                f"Movie {movie_id} failed: "
-                f"{response.status_code}"
-            )
-            return None
+        print("\nAvailable languages:")
 
-        return response.json()
+        for language in LANGUAGES:
+            print(language)
 
-    except Exception as e:
+        sys.exit(1)
+
+    language = sys.argv[1].lower()
+
+    if language not in LANGUAGES:
 
         print(
-            f"Movie {movie_id} error: {e}"
+            f"\nUnsupported language: {language}"
         )
 
-        return None
+        print("\nAvailable languages:")
+
+        for language in LANGUAGES:
+            print(language)
+
+        sys.exit(1)
+
+    return language, LANGUAGES[language]
 
 
-def get_movies():
+def fetch_movies(language_code):
 
     movies = []
 
-    print("Fetching popular movies...")
+    print(
+        f"\nScanning TMDB for "
+        f"{language_code} movies..."
+    )
 
-    for page in range(1, 50):
+    page = 1
+
+    while len(movies) < 100 and page <= 10:
 
         try:
 
-            response = session.get(
-                "https://api.themoviedb.org/3/movie/popular",
+            response = requests.get(
+                "https://api.themoviedb.org/3/discover/movie",
                 headers=HEADERS,
-                params={"page": page},
-                timeout=30
+                params={
+                    "with_original_language":
+                        language_code,
+
+                    "sort_by":
+                        "popularity.desc",
+
+                    "page":
+                        page,
+
+                    "include_adult":
+                        "false"
+                },
+                timeout=15
             )
 
             if response.status_code != 200:
 
                 print(
-                    f"Page {page} failed: "
+                    f"\nTMDB error: "
                     f"{response.status_code}"
                 )
 
+                page += 1
                 continue
 
             results = response.json().get(
@@ -109,58 +196,124 @@ def get_movies():
                 []
             )
 
+            if not results:
+                break
+
             movies.extend(results)
 
             print(
-                f"Page {page}/49 completed"
+                f"\rScanned {len(movies)} movies",
+                end=""
             )
 
-            time.sleep(1)
+            page += 1
 
         except Exception as e:
 
             print(
-                f"Page {page} error: {e}"
+                f"\nError on page {page}: {e}"
             )
 
+            page += 1
+
+    print()
+
+    unique_movies = {}
+
+    for movie in movies:
+
+        unique_movies[
+            movie["id"]
+        ] = movie
+
+    return list(
+        unique_movies.values()
+    )[:100]
+
+
+def get_movie_details(movie_id):
+
+    try:
+
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}",
+            headers=HEADERS,
+            params={
+                "append_to_response":
+                    "credits,keywords"
+            },
+            timeout=15
+        )
+
+        if response.status_code != 200:
+            return None
+
+        return response.json()
+
+    except Exception:
+        return None
+
+
+def fetch_details(movie_ids):
+
     print(
-        "Total movies fetched:",
-        len(movies)
+        f"\nFetching details for "
+        f"{len(movie_ids)} movies..."
     )
+
+    movies = []
+
+    completed = 0
+
+    with ThreadPoolExecutor(
+        max_workers=10
+    ) as executor:
+
+        futures = [
+            executor.submit(
+                get_movie_details,
+                movie_id
+            )
+            for movie_id in movie_ids
+        ]
+
+        for future in as_completed(futures):
+
+            completed += 1
+
+            print(
+                f"\rDetails: "
+                f"{completed}/{len(movie_ids)}",
+                end=""
+            )
+
+            result = future.result()
+
+            if result:
+                movies.append(result)
+
+    print()
 
     return movies
 
 
-def create_dataframe(movies):
+def create_dataframe(data):
 
-    movies_data = []
+    rows = []
 
-    print(
-        "Fetching complete movie details..."
-    )
-
-    for movie in tqdm(
-        movies[:600]
-    ):
-
-        data = get_complete_movie(
-            movie["id"]
-        )
-
-        if not data:
-            continue
+    for movie in data:
 
         genres = [
-            g["name"]
-            for g in data.get(
+            item["name"]
+            for item in movie.get(
                 "genres",
                 []
             )
         ]
 
         keywords = [
-            k["name"]
-            for k in data.get(
+            item["name"]
+            for item in movie.get(
                 "keywords",
                 {}
             ).get(
@@ -170,8 +323,8 @@ def create_dataframe(movies):
         ]
 
         cast = [
-            actor["name"]
-            for actor in data.get(
+            item["name"]
+            for item in movie.get(
                 "credits",
                 {}
             ).get(
@@ -182,7 +335,7 @@ def create_dataframe(movies):
 
         director = ""
 
-        for crew in data.get(
+        for crew in movie.get(
             "credits",
             {}
         ).get(
@@ -199,21 +352,19 @@ def create_dataframe(movies):
 
                 break
 
-        movies_data.append({
+        rows.append({
 
             "id":
-                data.get(
-                    "id"
-                ),
+                movie.get("id"),
 
             "title":
-                data.get(
+                movie.get(
                     "title",
                     ""
                 ),
 
             "overview":
-                data.get(
+                movie.get(
                     "overview",
                     ""
                 ),
@@ -224,12 +375,6 @@ def create_dataframe(movies):
             "keywords":
                 keywords,
 
-            "release_date":
-                data.get(
-                    "release_date",
-                    ""
-                ),
-
             "cast":
                 cast,
 
@@ -237,84 +382,40 @@ def create_dataframe(movies):
                 director,
 
             "language":
-                data.get(
+                movie.get(
                     "original_language",
                     ""
                 ),
 
             "rating":
-                data.get(
+                movie.get(
                     "vote_average",
                     0
                 ),
 
             "runtime":
-                data.get(
+                movie.get(
                     "runtime",
                     0
                 ),
 
+            "release_date":
+                movie.get(
+                    "release_date",
+                    ""
+                ),
+
             "poster_path":
-                data.get(
+                movie.get(
                     "poster_path",
                     ""
                 )
         })
 
-        time.sleep(0.1)
-
-    df = pd.DataFrame(
-        movies_data
-    )
-
-    return df
+    return pd.DataFrame(rows)
 
 
-def prepare_data(df):
-
-    df["overview"] = (
-        df["overview"]
-        .fillna("")
-        .astype(str)
-    )
-
-    df["director"] = (
-        df["director"]
-        .fillna("")
-        .astype(str)
-    )
-
-    df["genres"] = df["genres"].apply(
-        lambda x:
-            x if isinstance(
-                x,
-                list
-            )
-            else []
-    )
-
-    df["keywords"] = df["keywords"].apply(
-        lambda x:
-            x if isinstance(
-                x,
-                list
-            )
-            else []
-    )
-
-    df["cast"] = df["cast"].apply(
-        lambda x:
-            x if isinstance(
-                x,
-                list
-            )
-            else []
-    )
-
-    return df
-
-
-def make_movie_text(row):
+def create_movie_text(row):
 
     genres = ", ".join(
         row["genres"]
@@ -328,49 +429,119 @@ def make_movie_text(row):
         row["cast"]
     )
 
-    director = row["director"]
-
     return (
+        f"Title: {row['title']} "
         f"Overview: {row['overview']} "
         f"Genres: {genres} "
         f"Keywords: {keywords} "
         f"Cast: {cast} "
-        f"Director: {director}"
+        f"Director: {row['director']}"
     )
 
 
-def create_movies_dataframe(df):
+def prepare_movies(df):
+
+    df["overview"] = (
+        df["overview"]
+        .fillna("")
+        .astype(str)
+    )
+
+    df["genres"] = df["genres"].apply(
+        lambda x:
+        x if isinstance(x, list)
+        else []
+    )
+
+    df["keywords"] = df["keywords"].apply(
+        lambda x:
+        x if isinstance(x, list)
+        else []
+    )
+
+    df["cast"] = df["cast"].apply(
+        lambda x:
+        x if isinstance(x, list)
+        else []
+    )
 
     df["tags"] = df.apply(
-        make_movie_text,
+        create_movie_text,
         axis=1
     )
 
-    movies = df[[
-        "id",
-        "title",
-        "overview",
-        "genres",
-        "tags",
-        "language",
-        "rating",
-        "runtime",
-        "release_date",
-        "poster_path"
-    ]].copy()
-
-    movies["year"] = pd.to_datetime(
-        movies["release_date"],
+    df["year"] = pd.to_datetime(
+        df["release_date"],
         errors="coerce"
     ).dt.year
 
-    return movies
+    return df[
+        [
+            "id",
+            "title",
+            "overview",
+            "genres",
+            "keywords",
+            "cast",
+            "director",
+            "language",
+            "rating",
+            "runtime",
+            "release_date",
+            "year",
+            "poster_path",
+            "tags"
+        ]
+    ].copy()
+
+
+def has_poster(poster):
+
+    if poster is None:
+        return False
+
+    if pd.isna(poster):
+        return False
+
+    return str(poster).strip() != ""
+
+
+def filter_movies_with_posters(
+    movies,
+    posters
+):
+
+    keep_indexes = []
+
+    for index, row in movies.iterrows():
+
+        movie_id = row["id"]
+
+        poster = None
+
+        if isinstance(posters, dict):
+
+            poster = posters.get(
+                movie_id
+            )
+
+            if poster is None:
+
+                poster = posters.get(
+                    str(movie_id)
+                )
+
+        if has_poster(poster):
+
+            keep_indexes.append(index)
+
+    return keep_indexes
 
 
 def create_embeddings(movies):
 
     print(
-        "\nLoading SBERT model..."
+        "\nLoading multilingual model..."
     )
 
     model = SentenceTransformer(
@@ -387,44 +558,24 @@ def create_embeddings(movies):
         normalize_embeddings=True
     )
 
-    print(
-        "Embedding Shape:",
-        embeddings.shape
-    )
-
-    return embeddings
-
-
-def create_similarity(embeddings):
-
-    print(
-        "Creating similarity matrix..."
-    )
-
-    similarity = cosine_similarity(
+    return np.asarray(
         embeddings
     )
 
-    print(
-        "Similarity Shape:",
-        similarity.shape
+
+def update_posters(
+    old_posters,
+    movies
+):
+
+    if old_posters is None:
+        old_posters = {}
+
+    posters = dict(
+        old_posters
     )
 
-    return similarity
-
-
-def create_posters(movies):
-
-    print(
-        "\nCreating poster dictionary..."
-    )
-
-    poster_dict = {}
-
-    for _, movie in tqdm(
-        movies.iterrows(),
-        total=len(movies)
-    ):
+    for _, movie in movies.iterrows():
 
         movie_id = movie["id"]
 
@@ -432,209 +583,458 @@ def create_posters(movies):
             "poster_path"
         ]
 
-        if pd.notna(
+        if has_poster(
             poster_path
-        ) and poster_path:
+        ):
 
-            poster_dict[
-                movie_id
-            ] = (
+            posters[movie_id] = (
                 "https://image.tmdb.org/t/p/w500"
                 + str(poster_path)
             )
 
-        else:
-
-            poster_dict[
-                movie_id
-            ] = ""
-
-    return poster_dict
-
-
-def save_data(
-    movies,
-    embeddings,
-    similarity,
-    poster_dict
-):
-
-    print(
-        "\nSaving files..."
-    )
-
-    movies_path = os.path.join(
-        DATA_DIR,
-        "movies_API.pkl"
-    )
-
-    embeddings_path = os.path.join(
-        DATA_DIR,
-        "embeddings_API.pkl"
-    )
-
-    similarity_path = os.path.join(
-        DATA_DIR,
-        "similarity_API.pkl"
-    )
-
-    posters_path = os.path.join(
-        DATA_DIR,
-        "posters_API.pkl"
-    )
-
-    with open(
-        movies_path,
-        "wb"
-    ) as file:
-
-        pickle.dump(
-            movies,
-            file
-        )
-
-    with open(
-        embeddings_path,
-        "wb"
-    ) as file:
-
-        pickle.dump(
-            embeddings,
-            file
-        )
-
-    with open(
-        similarity_path,
-        "wb"
-    ) as file:
-
-        pickle.dump(
-            similarity,
-            file
-        )
-
-    with open(
-        posters_path,
-        "wb"
-    ) as file:
-
-        pickle.dump(
-            poster_dict,
-            file
-        )
-
-    print(
-        "\nAll files updated successfully."
-    )
-
-    print(
-        "Movies:",
-        movies_path
-    )
-
-    print(
-        "Embeddings:",
-        embeddings_path
-    )
-
-    print(
-        "Similarity:",
-        similarity_path
-    )
-
-    print(
-        "Posters:",
-        posters_path
-    )
+    return posters
 
 
 def main():
 
     print(
-        "================================"
+        "\n========================================"
     )
 
     print(
-        "       MOVIEVERSE DATA UPDATE"
+        "       MOVIEVERSE DATA UPDATER"
     )
 
     print(
-        "================================\n"
+        "========================================"
     )
 
-    movies = get_movies()
+    language_name, language_code = (
+        get_language()
+    )
 
-    if not movies:
+    print(
+        f"\nSelected language: "
+        f"{language_name}"
+    )
 
-        raise RuntimeError(
-            "No movies were fetched."
+    old_movies = load_pickle(
+        MOVIES_PATH
+    )
+
+    old_embeddings = load_pickle(
+        EMBEDDINGS_PATH
+    )
+
+    old_posters = load_pickle(
+        POSTERS_PATH,
+        {}
+    )
+
+    if old_movies is None:
+
+        raise FileNotFoundError(
+            "movies_API.pkl was not found."
         )
 
-    df = create_dataframe(
-        movies
+    if not isinstance(
+        old_movies,
+        pd.DataFrame
+    ):
+
+        old_movies = pd.DataFrame(
+            old_movies
+        )
+
+    old_movies = old_movies.copy()
+
+    print(
+        f"\nExisting movies: "
+        f"{len(old_movies)}"
+    )
+
+    existing_ids = set(
+        old_movies["id"]
+        .astype(str)
+    )
+
+    candidates = fetch_movies(
+        language_code
+    )
+
+    new_ids = []
+
+    for movie in candidates:
+
+        movie_id = str(
+            movie["id"]
+        )
+
+        if movie_id not in existing_ids:
+
+            new_ids.append(
+                movie["id"]
+            )
+
+        if len(new_ids) >= 100:
+            break
+
+    print(
+        f"New candidates: "
+        f"{len(new_ids)}"
+    )
+
+    if not new_ids:
+
+        print(
+            "\nNo new movies found."
+        )
+
+        return
+
+    details = fetch_details(
+        new_ids
+    )
+
+    if not details:
+
+        print(
+            "\nNo movie details found."
+        )
+
+        return
+
+    new_movies = create_dataframe(
+        details
+    )
+
+    new_movies = prepare_movies(
+        new_movies
+    )
+
+    new_movies = new_movies[
+        ~new_movies["id"]
+        .astype(str)
+        .isin(existing_ids)
+    ]
+
+    print(
+        f"\nNew movies after duplicate check: "
+        f"{len(new_movies)}"
+    )
+
+    if len(new_movies) == 0:
+
+        print(
+            "\nNo genuinely new movies."
+        )
+
+        return
+
+    new_posters = {}
+
+    for _, movie in new_movies.iterrows():
+
+        poster_path = movie[
+            "poster_path"
+        ]
+
+        if has_poster(
+            poster_path
+        ):
+
+            new_posters[
+                movie["id"]
+            ] = (
+                "https://image.tmdb.org/t/p/w500"
+                + str(poster_path)
+            )
+
+    new_movies = new_movies[
+        new_movies["id"].isin(
+            new_posters.keys()
+        )
+    ].reset_index(drop=True)
+
+    print(
+        f"New movies with posters: "
+        f"{len(new_movies)}"
+    )
+
+    if len(new_movies) == 0:
+
+        print(
+            "\nNone of the new movies "
+            "has a poster."
+        )
+
+        return
+
+    combined_movies = pd.concat(
+        [
+            old_movies,
+            new_movies
+        ],
+        ignore_index=True
+    )
+
+    combined_posters = dict(
+        old_posters
+    )
+
+    combined_posters.update(
+        new_posters
     )
 
     print(
-        "\nDataFrame created:"
+        "\nChecking existing movies "
+        "for missing posters..."
+    )
+
+    keep_indexes = (
+        filter_movies_with_posters(
+            combined_movies,
+            combined_posters
+        )
+    )
+
+    removed_count = (
+        len(combined_movies)
+        - len(keep_indexes)
     )
 
     print(
-        df.shape
+        f"Movies without posters removed: "
+        f"{removed_count}"
     )
 
-    df = prepare_data(
-        df
+    combined_movies = combined_movies.iloc[
+        keep_indexes
+    ].reset_index(drop=True)
+
+    valid_ids = set(
+        combined_movies["id"]
+        .astype(str)
     )
 
-    movies_df = create_movies_dataframe(
-        df
+    cleaned_posters = {}
+
+    for movie_id, poster in (
+        combined_posters.items()
+    ):
+
+        if (
+            str(movie_id)
+            in valid_ids
+            and has_poster(poster)
+        ):
+
+            cleaned_posters[
+                movie_id
+            ] = poster
+
+    print(
+        f"\nFinal movie count: "
+        f"{len(combined_movies)}"
     )
 
     print(
-        "\nMovie dataframe:"
+        "\nCreating embeddings..."
+    )
+
+    old_id_to_embedding = {}
+
+    if old_embeddings is not None:
+
+        old_embeddings = np.asarray(
+            old_embeddings
+        )
+
+        old_ids = old_movies[
+            "id"
+        ].astype(str).tolist()
+
+        for i, movie_id in enumerate(
+            old_ids
+        ):
+
+            old_id_to_embedding[
+                movie_id
+            ] = old_embeddings[i]
+
+    model = SentenceTransformer(
+        "paraphrase-multilingual-MiniLM-L12-v2"
+    )
+
+    new_embeddings = model.encode(
+        new_movies["tags"].tolist(),
+        show_progress_bar=True,
+        normalize_embeddings=True
+    )
+
+    new_embedding_map = {}
+
+    for i, movie_id in enumerate(
+        new_movies["id"]
+    ):
+
+        new_embedding_map[
+            str(movie_id)
+        ] = new_embeddings[i]
+
+    final_embeddings = []
+
+    for _, movie in combined_movies.iterrows():
+
+        movie_id = str(
+            movie["id"]
+        )
+
+        if movie_id in old_id_to_embedding:
+
+            final_embeddings.append(
+                old_id_to_embedding[
+                    movie_id
+                ]
+            )
+
+        elif movie_id in new_embedding_map:
+
+            final_embeddings.append(
+                new_embedding_map[
+                    movie_id
+                ]
+            )
+
+    final_embeddings = np.asarray(
+        final_embeddings
+    )
+
+    if len(final_embeddings) != len(
+        combined_movies
+    ):
+
+        raise ValueError(
+            "Movie and embedding counts "
+            "do not match."
+        )
+
+    print(
+        f"\nFinal embeddings: "
+        f"{final_embeddings.shape}"
     )
 
     print(
-        movies_df[
-            [
-                "id",
-                "title",
-                "overview",
-                "genres",
-                "rating"
-            ]
-        ].head()
+        "\nCreating COMPLETE similarity matrix..."
     )
 
-    embeddings = create_embeddings(
-        movies_df
-    )
-
-    similarity = create_similarity(
-        embeddings
-    )
-
-    poster_dict = create_posters(
-        movies_df
-    )
-
-    save_data(
-        movies_df,
-        embeddings,
-        similarity,
-        poster_dict
+    similarity = cosine_similarity(
+        final_embeddings
     )
 
     print(
-        "\n================================"
+        f"Similarity matrix: "
+        f"{similarity.shape}"
+    )
+
+    if similarity.shape[0] != len(
+        combined_movies
+    ):
+
+        raise ValueError(
+            "Similarity matrix size "
+            "does not match movies."
+        )
+
+    print(
+        "\nSaving files..."
+    )
+
+    save_pickle(
+        MOVIES_PATH,
+        combined_movies
+    )
+
+    save_pickle(
+        EMBEDDINGS_PATH,
+        final_embeddings
+    )
+
+    save_pickle(
+        SIMILARITY_PATH,
+        similarity
+    )
+
+    save_pickle(
+        POSTERS_PATH,
+        cleaned_posters
     )
 
     print(
-        "       UPDATE COMPLETE"
+        "\n========================================"
     )
 
     print(
-        "================================"
+        "          UPDATE COMPLETE"
+    )
+
+    print(
+        "========================================"
+    )
+
+    print(
+        f"\nExisting movies      : "
+        f"{len(old_movies)}"
+    )
+
+    print(
+        f"New movies added     : "
+        f"{len(new_movies)}"
+    )
+
+    print(
+        f"No-poster removed    : "
+        f"{removed_count}"
+    )
+
+    print(
+        f"Final movies         : "
+        f"{len(combined_movies)}"
+    )
+
+    print(
+        f"Embeddings           : "
+        f"{final_embeddings.shape}"
+    )
+
+    print(
+        f"Similarity            : "
+        f"{similarity.shape}"
+    )
+
+    print(
+        f"Posters               : "
+        f"{len(cleaned_posters)}"
+    )
+
+    print(
+        "\nUpdated files:"
+    )
+
+    print(
+        "✓ movies_API.pkl"
+    )
+
+    print(
+        "✓ embeddings_API.pkl"
+    )
+
+    print(
+        "✓ similarity_API.pkl"
+    )
+
+    print(
+        "✓ posters_API.pkl"
     )
 
 
