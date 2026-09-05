@@ -515,10 +515,17 @@ def recommend(
 def top_rated(
     limit: int = 10
 ):
-
     all_movies = rows_as_list()
 
-    all_movies.sort(
+    # Keep only English movies
+    english_movies = [
+        movie
+        for movie in all_movies
+        if movie.get("language", "").strip().lower() == "english"
+    ]
+
+    # Sort English movies by rating
+    english_movies.sort(
         key=lambda movie: movie.get(
             "rating",
             0
@@ -526,10 +533,10 @@ def top_rated(
         reverse=True
     )
 
-    return all_movies[
-        :max(1, min(limit, 30))
+    # Return top 10 English movies
+    return english_movies[
+        :max(1, min(limit, 10))
     ]
-
 
 @app.get("/discover")
 def discover(
