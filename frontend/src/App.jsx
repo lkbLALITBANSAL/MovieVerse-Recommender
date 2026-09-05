@@ -7,6 +7,8 @@ import {
   discoverMovies
 } from "./api";
 
+import "./styles.css";
+
 function App() {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]);
@@ -28,9 +30,30 @@ function App() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
 
+  // ==================================================
+  // PRELOAD FIRST 10 TOP-RATED POSTERS
+  // ==================================================
+
+  function preloadImages(movies) {
+    movies.slice(0, 10).forEach(movie => {
+      if (movie?.poster_url) {
+        const img = new Image();
+        img.src = movie.poster_url;
+      }
+    });
+  }
+
+  // ==================================================
+  // LOAD TOP RATED MOVIES
+  // ==================================================
+
   useEffect(() => {
     loadTopRated();
   }, []);
+
+  // ==================================================
+  // SEARCH SUGGESTIONS
+  // ==================================================
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -53,14 +76,26 @@ function App() {
     }
   }
 
+  // ==================================================
+  // LOAD TOP RATED
+  // ==================================================
+
   async function loadTopRated() {
     try {
       const data = await getTopRated(10);
+
       setTopRated(data || []);
+
+      // Start downloading the first 10 posters immediately
+      preloadImages(data || []);
     } catch {
       setTopRated([]);
     }
   }
+
+  // ==================================================
+  // SELECT MOVIE
+  // ==================================================
 
   async function selectMovie(movie) {
     setSuggestions([]);
@@ -90,6 +125,10 @@ function App() {
     }
   }
 
+  // ==================================================
+  // SEARCH
+  // ==================================================
+
   async function handleSearch(e) {
     e.preventDefault();
 
@@ -109,6 +148,10 @@ function App() {
       setError("Unable to connect to MovieVerse backend.");
     }
   }
+
+  // ==================================================
+  // FIND MOVIE BY MOOD
+  // ==================================================
 
   async function findMovie(regenerate = false) {
     setDiscoverLoading(true);
@@ -171,6 +214,7 @@ function App() {
       }, 100);
     } catch (err) {
       console.error(err);
+
       setDiscoverError(
         "Unable to find a movie. Please try again."
       );
@@ -178,6 +222,10 @@ function App() {
       setDiscoverLoading(false);
     }
   }
+
+  // ==================================================
+  // CLEAR FILTERS
+  // ==================================================
 
   function clearFilters() {
     setMood("");
@@ -191,6 +239,10 @@ function App() {
     setDiscoverError("");
   }
 
+  // ==================================================
+  // SCROLL TO FINDER
+  // ==================================================
+
   function scrollToFinder() {
     document
       .getElementById("movie-finder")
@@ -199,7 +251,11 @@ function App() {
       });
   }
 
-  function MovieCard({ movie }) {
+  // ==================================================
+  // MOVIE CARD
+  // ==================================================
+
+  function MovieCard({ movie, priority = false }) {
     return (
       <div
         className="movie-card"
@@ -209,6 +265,8 @@ function App() {
           <img
             src={movie.poster_url}
             alt={movie.title}
+            loading={priority ? "eager" : "lazy"}
+            decoding="async"
           />
         ) : (
           <div className="no-poster">
@@ -244,8 +302,16 @@ function App() {
     );
   }
 
+  // ==================================================
+  // UI
+  // ==================================================
+
   return (
     <div className="app">
+
+      {/* ==================================================
+          NAVBAR
+      ================================================== */}
 
       <header className="navbar">
 
@@ -295,8 +361,15 @@ function App() {
 
       </header>
 
+      {/* ==================================================
+          MAIN
+      ================================================== */}
 
       <main>
+
+        {/* ==================================================
+            HERO
+        ================================================== */}
 
         <section className="hero">
 
@@ -337,6 +410,7 @@ function App() {
                 Search
               </button>
 
+              {/* SEARCH SUGGESTIONS */}
 
               {suggestions.length > 0 && (
 
@@ -359,6 +433,8 @@ function App() {
                           <img
                             src={movie.poster_url}
                             alt=""
+                            loading="lazy"
+                            decoding="async"
                           />
 
                         ) : (
@@ -397,7 +473,6 @@ function App() {
 
             </form>
 
-
             <button
               className="mood-hero-button"
               onClick={scrollToFinder}
@@ -409,6 +484,9 @@ function App() {
 
         </section>
 
+        {/* ==================================================
+            ERROR
+        ================================================== */}
 
         {error && (
           <div className="error-message">
@@ -416,6 +494,9 @@ function App() {
           </div>
         )}
 
+        {/* ==================================================
+            LOADING
+        ================================================== */}
 
         {loading && (
           <div className="loading">
@@ -423,6 +504,9 @@ function App() {
           </div>
         )}
 
+        {/* ==================================================
+            MOVIE DETAILS
+        ================================================== */}
 
         {selectedMovie && (
 
@@ -439,7 +523,6 @@ function App() {
 
             </div>
 
-
             <div className="movie-details">
 
               <div className="main-poster">
@@ -449,6 +532,8 @@ function App() {
                   <img
                     src={selectedMovie.poster_url}
                     alt={selectedMovie.title}
+                    loading="eager"
+                    decoding="async"
                   />
 
                 ) : (
@@ -461,13 +546,11 @@ function App() {
 
               </div>
 
-
               <div className="movie-info">
 
                 <h1>
                   {selectedMovie.title}
                 </h1>
-
 
                 <div className="movie-tags">
 
@@ -496,7 +579,6 @@ function App() {
 
                 </div>
 
-
                 {selectedMovie.genres && (
 
                   <div className="detail-row">
@@ -512,7 +594,6 @@ function App() {
                   </div>
 
                 )}
-
 
                 {selectedMovie.language && (
 
@@ -530,7 +611,6 @@ function App() {
 
                 )}
 
-
                 {selectedMovie.director && (
 
                   <div className="detail-row">
@@ -547,7 +627,6 @@ function App() {
 
                 )}
 
-
                 {selectedMovie.cast && (
 
                   <div className="detail-row">
@@ -563,7 +642,6 @@ function App() {
                   </div>
 
                 )}
-
 
                 {selectedMovie.overview && (
 
@@ -589,6 +667,9 @@ function App() {
 
         )}
 
+        {/* ==================================================
+            RELATED MOVIES
+        ================================================== */}
 
         {selectedMovie &&
           recommendations.length > 0 && (
@@ -607,7 +688,6 @@ function App() {
 
               </div>
 
-
               <div className="movie-grid">
 
                 {recommendations.map(movie => (
@@ -625,6 +705,9 @@ function App() {
 
           )}
 
+        {/* ==================================================
+            MOVIE FINDER
+        ================================================== */}
 
         <section
           className="finder-section"
@@ -656,15 +739,15 @@ function App() {
 
           </div>
 
-
           <div className="finder-box">
+
+            {/* MOOD */}
 
             <div className="filter-group">
 
               <label>
                 How is your mood today?
               </label>
-
 
               <div className="mood-options">
 
@@ -710,8 +793,11 @@ function App() {
 
             </div>
 
+            {/* FILTER GRID */}
 
             <div className="filter-grid">
+
+              {/* GENRE */}
 
               <div className="filter-group">
 
@@ -786,6 +872,7 @@ function App() {
 
               </div>
 
+              {/* RATING */}
 
               <div className="filter-group">
 
@@ -824,6 +911,7 @@ function App() {
 
               </div>
 
+              {/* LANGUAGE */}
 
               <div className="filter-group">
 
@@ -906,6 +994,7 @@ function App() {
 
               </div>
 
+              {/* YEAR */}
 
               <div className="filter-group">
 
@@ -941,6 +1030,7 @@ function App() {
 
             </div>
 
+            {/* ACTIONS */}
 
             <div className="finder-actions">
 
@@ -960,7 +1050,6 @@ function App() {
 
               </button>
 
-
               <button
                 type="button"
                 className="clear-button"
@@ -973,6 +1062,7 @@ function App() {
 
           </div>
 
+          {/* FINDER ERROR */}
 
           {discoverError && (
 
@@ -982,6 +1072,7 @@ function App() {
 
           )}
 
+          {/* DISCOVER RESULT */}
 
           {discoverMovie && (
 
@@ -997,6 +1088,8 @@ function App() {
                   <img
                     src={discoverMovie.poster_url}
                     alt={discoverMovie.title}
+                    loading="eager"
+                    decoding="async"
                   />
 
                 ) : (
@@ -1009,18 +1102,15 @@ function App() {
 
               </div>
 
-
               <div className="discover-details">
 
                 <div className="picked-label">
                   ✨ YOUR MOVIE
                 </div>
 
-
                 <h2>
                   {discoverMovie.title}
                 </h2>
-
 
                 <div className="discover-meta">
 
@@ -1053,7 +1143,6 @@ function App() {
 
                 </div>
 
-
                 {discoverMovie.genres && (
 
                   <div className="discover-detail">
@@ -1069,7 +1158,6 @@ function App() {
                   </div>
 
                 )}
-
 
                 {discoverMovie.language && (
 
@@ -1087,7 +1175,6 @@ function App() {
 
                 )}
 
-
                 {discoverMovie.director && (
 
                   <div className="discover-detail">
@@ -1103,7 +1190,6 @@ function App() {
                   </div>
 
                 )}
-
 
                 {discoverMovie.cast && (
 
@@ -1121,7 +1207,6 @@ function App() {
 
                 )}
 
-
                 {discoverMovie.release_date && (
 
                   <div className="discover-detail">
@@ -1138,7 +1223,6 @@ function App() {
 
                 )}
 
-
                 {discoverMovie.overview && (
 
                   <div className="discover-overview">
@@ -1154,7 +1238,6 @@ function App() {
                   </div>
 
                 )}
-
 
                 <button
                   type="button"
@@ -1180,6 +1263,9 @@ function App() {
 
         </section>
 
+        {/* ==================================================
+            TOP RATED
+        ================================================== */}
 
         <section
           className="content-section top-rated-section"
@@ -1203,14 +1289,14 @@ function App() {
 
           </div>
 
-
           <div className="movie-grid">
 
-            {topRated.map(movie => (
+            {topRated.map((movie, index) => (
 
               <MovieCard
                 key={movie.id}
                 movie={movie}
+                priority={index < 10}
               />
 
             ))}
@@ -1221,6 +1307,9 @@ function App() {
 
       </main>
 
+      {/* ==================================================
+          FOOTER
+      ================================================== */}
 
       <footer>
 
