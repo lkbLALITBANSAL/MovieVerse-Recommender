@@ -8,8 +8,8 @@ The application combines a machine-learning recommendation system with a modern 
 
 ## 🚀 Live Demo
 
-🌐 **MovieVerse:**  
-[open website](https://movie-verse-recommender.vercel.app/)
+🌐 **MovieVerse:**   [open website](https://movie-verse-recommender.vercel.app/)
+                   
 
 ---
 
