@@ -1,4 +1,13 @@
 import { useEffect, useState } from "react";
+import Navbar from "./components/Navbar.jsx";
+import HeroSearch from "./components/Herosearch.jsx";
+import MovieDetails from "./components/Moviedetails.jsx";
+import RelatedMovies from "./components/Relatedmovies.jsx";
+import MovieFinder from "./components/MovieFinder.jsx";
+import DiscoverResult from "./components/Discoverresult.jsx";
+import TopRatedMovies from "./components/TopRatedMovies.jsx";
+import Footer from "./components/Footer.jsx";
+
 import {
   searchMovies,
   getMovie,
@@ -30,10 +39,7 @@ function App() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
 
-  // ==================================================
   // PRELOAD FIRST 10 TOP-RATED POSTERS
-  // ==================================================
-
   function preloadImages(movies) {
     movies.slice(0, 10).forEach(movie => {
       if (movie?.poster_url) {
@@ -43,17 +49,13 @@ function App() {
     });
   }
 
-  // ==================================================
   // LOAD TOP RATED MOVIES
-  // ==================================================
 
   useEffect(() => {
     loadTopRated();
   }, []);
 
-  // ==================================================
   // SEARCH SUGGESTIONS
-  // ==================================================
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -76,9 +78,7 @@ function App() {
     }
   }
 
-  // ==================================================
   // LOAD TOP RATED
-  // ==================================================
 
   async function loadTopRated() {
     try {
@@ -93,9 +93,7 @@ function App() {
     }
   }
 
-  // ==================================================
   // SELECT MOVIE
-  // ==================================================
 
   async function selectMovie(movie) {
     setSuggestions([]);
@@ -125,9 +123,7 @@ function App() {
     }
   }
 
-  // ==================================================
   // SEARCH
-  // ==================================================
 
   async function handleSearch(e) {
     e.preventDefault();
@@ -149,9 +145,7 @@ function App() {
     }
   }
 
-  // ==================================================
   // FIND MOVIE BY MOOD
-  // ==================================================
 
   async function findMovie(regenerate = false) {
     setDiscoverLoading(true);
@@ -223,9 +217,7 @@ function App() {
     }
   }
 
-  // ==================================================
   // CLEAR FILTERS
-  // ==================================================
 
   function clearFilters() {
     setMood("");
@@ -239,9 +231,7 @@ function App() {
     setDiscoverError("");
   }
 
-  // ==================================================
   // SCROLL TO FINDER
-  // ==================================================
 
   function scrollToFinder() {
     document
@@ -251,242 +241,31 @@ function App() {
       });
   }
 
-  // ==================================================
-  // MOVIE CARD
-  // ==================================================
+  
 
-  function MovieCard({ movie, priority = false }) {
-    return (
-      <div
-        className="movie-card"
-        onClick={() => selectMovie(movie)}
-      >
-        {movie.poster_url ? (
-          <img
-            src={movie.poster_url}
-            alt={movie.title}
-            loading={priority ? "eager" : "lazy"}
-            decoding="async"
-          />
-        ) : (
-          <div className="no-poster">
-            🎬
-          </div>
-        )}
 
-        <div className="movie-card-info">
-
-          <h3>{movie.title}</h3>
-
-          <div className="card-meta">
-
-            <span>
-              ⭐{" "}
-              {movie.rating
-                ? Number(movie.rating).toFixed(1)
-                : "N/A"}
-            </span>
-
-            {movie.year && (
-              <span>{movie.year}</span>
-            )}
-
-          </div>
-
-          {movie.genres && (
-            <p>{movie.genres}</p>
-          )}
-
-        </div>
-      </div>
-    );
-  }
-
-  // ==================================================
   // UI
-  // ==================================================
 
   return (
     <div className="app">
 
-      {/* ==================================================
-          NAVBAR
-      ================================================== */}
-
-      <header className="navbar">
-
-        <div
-          className="logo"
-          onClick={() => {
-            window.scrollTo({
-              top: 0,
-              behavior: "smooth"
-            });
-          }}
-        >
-          <span>🎬</span>
-          <span>MovieVerse</span>
-        </div>
-
-        <nav>
-
-          <button
-            onClick={() =>
-              window.scrollTo({
-                top: 0,
-                behavior: "smooth"
-              })
-            }
-          >
-            Home
-          </button>
-
-          <button onClick={scrollToFinder}>
-            Find by Mood
-          </button>
-
-          <button
-            onClick={() =>
-              document
-                .getElementById("top-rated")
-                ?.scrollIntoView({
-                  behavior: "smooth"
-                })
-            }
-          >
-            Top Rated
-          </button>
-
-        </nav>
-
-      </header>
-
-      {/* ==================================================
-          MAIN
-      ================================================== */}
+    <Navbar scrollToFinder={scrollToFinder} />
+     
 
       <main>
 
-        {/* ==================================================
-            HERO
-        ================================================== */}
+      <HeroSearch
+  query={query}
+  setQuery={setQuery}
+  suggestions={suggestions}
+  handleSearch={handleSearch}
+  selectMovie={selectMovie}
+  scrollToFinder={scrollToFinder}
+/>
 
-        <section className="hero">
-
-          <div className="hero-content">
-
-            <p className="hero-small">
-              WELCOME TO MOVIEVERSE
-            </p>
-
-            <h1>
-              Discover your next
-              <span> favorite movie.</span>
-            </h1>
-
-            <p className="hero-description">
-              Search movies or let MovieVerse
-              find the perfect movie based on
-              your mood and preferences.
-            </p>
-
-            <form
-              className="search-box"
-              onSubmit={handleSearch}
-            >
-
-              <span>🔍</span>
-
-              <input
-                type="text"
-                value={query}
-                placeholder="Search for a movie..."
-                onChange={e =>
-                  setQuery(e.target.value)
-                }
-              />
-
-              <button type="submit">
-                Search
-              </button>
-
-              {/* SEARCH SUGGESTIONS */}
-
-              {suggestions.length > 0 && (
-
-                <div className="suggestions">
-
-                  {suggestions
-                    .slice(0, 6)
-                    .map(movie => (
-
-                      <div
-                        className="suggestion"
-                        key={movie.id}
-                        onClick={() =>
-                          selectMovie(movie)
-                        }
-                      >
-
-                        {movie.poster_url ? (
-
-                          <img
-                            src={movie.poster_url}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                          />
-
-                        ) : (
-
-                          <div className="suggestion-poster">
-                            🎬
-                          </div>
-
-                        )}
-
-                        <div>
-
-                          <strong>
-                            {movie.title}
-                          </strong>
-
-                          <small>
-                            {movie.year || ""}
-
-                            {movie.rating
-                              ? ` • ⭐ ${Number(
-                                  movie.rating
-                                ).toFixed(1)}`
-                              : ""}
-                          </small>
-
-                        </div>
-
-                      </div>
-
-                    ))}
-
-                </div>
-
-              )}
-
-            </form>
-
-            <button
-              className="mood-hero-button"
-              onClick={scrollToFinder}
-            >
-              ✨ Find a Movie for My Mood
-            </button>
-
-          </div>
-
-        </section>
-
-        {/* ==================================================
-            ERROR
-        ================================================== */}
+        
+           
+       
 
         {error && (
           <div className="error-message">
@@ -494,9 +273,9 @@ function App() {
           </div>
         )}
 
-        {/* ==================================================
-            LOADING
-        ================================================== */}
+        
+           {/* LOADING */}
+        
 
         {loading && (
           <div className="loading">
@@ -504,210 +283,25 @@ function App() {
           </div>
         )}
 
-        {/* ==================================================
+{/*         
             MOVIE DETAILS
-        ================================================== */}
+         */}
 
         {selectedMovie && (
-
-          <section
-            className="movie-details-section"
-            id="movie-details"
-          >
-
-            <div className="section-heading">
-
-              <p>YOUR MOVIE</p>
-
-              <h2>Movie Details</h2>
-
-            </div>
-
-            <div className="movie-details">
-
-              <div className="main-poster">
-
-                {selectedMovie.poster_url ? (
-
-                  <img
-                    src={selectedMovie.poster_url}
-                    alt={selectedMovie.title}
-                    loading="eager"
-                    decoding="async"
-                  />
-
-                ) : (
-
-                  <div className="large-no-poster">
-                    🎬
-                  </div>
-
-                )}
-
-              </div>
-
-              <div className="movie-info">
-
-                <h1>
-                  {selectedMovie.title}
-                </h1>
-
-                <div className="movie-tags">
-
-                  {selectedMovie.rating > 0 && (
-
-                    <span className="rating">
-                      ⭐{" "}
-                      {Number(
-                        selectedMovie.rating
-                      ).toFixed(1)}
-                    </span>
-
-                  )}
-
-                  {selectedMovie.year && (
-                    <span>
-                      📅 {selectedMovie.year}
-                    </span>
-                  )}
-
-                  {selectedMovie.runtime > 0 && (
-                    <span>
-                      ⏱ {selectedMovie.runtime} min
-                    </span>
-                  )}
-
-                </div>
-
-                {selectedMovie.genres && (
-
-                  <div className="detail-row">
-
-                    <strong>
-                      Genres
-                    </strong>
-
-                    <span>
-                      {selectedMovie.genres}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {selectedMovie.language && (
-
-                  <div className="detail-row">
-
-                    <strong>
-                      Language
-                    </strong>
-
-                    <span>
-                      {selectedMovie.language}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {selectedMovie.director && (
-
-                  <div className="detail-row">
-
-                    <strong>
-                      Director
-                    </strong>
-
-                    <span>
-                      {selectedMovie.director}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {selectedMovie.cast && (
-
-                  <div className="detail-row">
-
-                    <strong>
-                      Cast
-                    </strong>
-
-                    <span>
-                      {selectedMovie.cast}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {selectedMovie.overview && (
-
-                  <div className="overview">
-
-                    <h3>
-                      Overview
-                    </h3>
-
-                    <p>
-                      {selectedMovie.overview}
-                    </p>
-
-                  </div>
-
-                )}
-
-              </div>
-
-            </div>
-
-          </section>
-
-        )}
-
-        {/* ==================================================
-            RELATED MOVIES
-        ================================================== */}
-
-        {selectedMovie &&
-          recommendations.length > 0 && (
-
-            <section className="content-section">
-
-              <div className="section-heading">
-
-                <p>
-                  BECAUSE YOU LIKED IT
-                </p>
-
-                <h2>
-                  Related Movies
-                </h2>
-
-              </div>
-
-              <div className="movie-grid">
-
-                {recommendations.map(movie => (
-
-                  <MovieCard
-                    key={movie.id}
-                    movie={movie}
-                  />
-
-                ))}
-
-              </div>
-
-            </section>
-
-          )}
-
-        {/* ==================================================
-            MOVIE FINDER
-        ================================================== */}
+  <MovieDetails selectedMovie={selectedMovie} />
+)}
+
+        
+            {/* RELATED MOVIES */}
+        
+
+       <RelatedMovies
+  selectedMovie={selectedMovie}
+  recommendations={recommendations}
+  selectMovie={selectMovie}
+/>
+
+            {/* MOVIE FINDER */}
 
         <section
           className="finder-section"
@@ -739,328 +333,24 @@ function App() {
 
           </div>
 
-          <div className="finder-box">
-
-            {/* MOOD */}
-
-            <div className="filter-group">
-
-              <label>
-                How is your mood today?
-              </label>
-
-              <div className="mood-options">
-
-                {[
-                  ["Happy", "😊"],
-                  ["Sad", "😢"],
-                  ["Romantic", "❤️"],
-                  ["Excited", "🔥"],
-                  ["Chill", "😎"],
-                  ["Thrilled", "😱"],
-                  ["Thoughtful", "🧠"],
-                  ["Funny", "😂"]
-                ].map(([name, emoji]) => (
-
-                  <button
-                    type="button"
-                    key={name}
-                    className={
-                      mood === name
-                        ? "mood-option active"
-                        : "mood-option"
-                    }
-                    onClick={() =>
-                      setMood(
-                        mood === name
-                          ? ""
-                          : name
-                      )
-                    }
-                  >
-
-                    <span>
-                      {emoji}
-                    </span>
-
-                    {name}
-
-                  </button>
-
-                ))}
-
-              </div>
-
-            </div>
-
-            {/* FILTER GRID */}
-
-            <div className="filter-grid">
-
-              {/* GENRE */}
-
-              <div className="filter-group">
-
-                <label>
-                  🎭 Genre
-                </label>
-
-                <select
-                  value={genre}
-                  onChange={e =>
-                    setGenre(e.target.value)
-                  }
-                >
-
-                  <option value="">
-                    Any Genre
-                  </option>
-
-                  <option value="Action">
-                    Action
-                  </option>
-
-                  <option value="Adventure">
-                    Adventure
-                  </option>
-
-                  <option value="Animation">
-                    Animation
-                  </option>
-
-                  <option value="Comedy">
-                    Comedy
-                  </option>
-
-                  <option value="Crime">
-                    Crime
-                  </option>
-
-                  <option value="Drama">
-                    Drama
-                  </option>
-
-                  <option value="Horror">
-                    Horror
-                  </option>
-
-                  <option value="Mystery">
-                    Mystery
-                  </option>
-
-                  <option value="Romance">
-                    Romance
-                  </option>
-
-                  <option value="Science Fiction">
-                    Science Fiction
-                  </option>
-
-                  <option value="Thriller">
-                    Thriller
-                  </option>
-
-                  <option value="Family">
-                    Family
-                  </option>
-
-                  <option value="Fantasy">
-                    Fantasy
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* RATING */}
-
-              <div className="filter-group">
-
-                <label>
-                  ⭐ Minimum Rating
-                </label>
-
-                <select
-                  value={rating}
-                  onChange={e =>
-                    setRating(e.target.value)
-                  }
-                >
-
-                  <option value="">
-                    Any Rating
-                  </option>
-
-                  <option value="6">
-                    6.0+
-                  </option>
-
-                  <option value="7">
-                    7.0+
-                  </option>
-
-                  <option value="8">
-                    8.0+
-                  </option>
-
-                  <option value="9">
-                    9.0+
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* LANGUAGE */}
-
-              <div className="filter-group">
-
-                <label>
-                  🌐 Language
-                </label>
-
-                <select
-                  value={language}
-                  onChange={e =>
-                    setLanguage(e.target.value)
-                  }
-                >
-
-                  <option value="">
-                    Any Language
-                  </option>
-
-                  <option value="English">
-                    English
-                  </option>
-
-                  <option value="Hindi">
-                    Hindi
-                  </option>
-
-                  <option value="Spanish">
-                    Spanish
-                  </option>
-
-                  <option value="Japanese">
-                    Japanese
-                  </option>
-
-                  <option value="Korean">
-                    Korean
-                  </option>
-
-                  <option value="French">
-                    French
-                  </option>
-
-                  <option value="German">
-                    German
-                  </option>
-
-                  <option value="Italian">
-                    Italian
-                  </option>
-
-                  <option value="Chinese">
-                    Chinese
-                  </option>
-
-                  <option value="Russian">
-                    Russian
-                  </option>
-
-                  <option value="Portuguese">
-                    Portuguese
-                  </option>
-
-                  <option value="Arabic">
-                    Arabic
-                  </option>
-
-                  <option value="Telugu">
-                    Telugu
-                  </option>
-
-                  <option value="Tamil">
-                    Tamil
-                  </option>
-
-                  <option value="Malayalam">
-                    Malayalam
-                  </option>
-
-                </select>
-
-              </div>
-
-              {/* YEAR */}
-
-              <div className="filter-group">
-
-                <label>
-                  📅 Release Year
-                </label>
-
-                <div className="year-inputs">
-
-                  <input
-                    type="number"
-                    placeholder="From"
-                    value={yearFrom}
-                    onChange={e =>
-                      setYearFrom(e.target.value)
-                    }
-                  />
-
-                  <span>—</span>
-
-                  <input
-                    type="number"
-                    placeholder="To"
-                    value={yearTo}
-                    onChange={e =>
-                      setYearTo(e.target.value)
-                    }
-                  />
-
-                </div>
-
-              </div>
-
-            </div>
-
-            {/* ACTIONS */}
-
-            <div className="finder-actions">
-
-              <button
-                type="button"
-                className="find-button"
-                onClick={() => {
-                  setExcludedMovies([]);
-                  findMovie(false);
-                }}
-                disabled={discoverLoading}
-              >
-
-                {discoverLoading
-                  ? "Finding..."
-                  : "🎬 Find Movie"}
-
-              </button>
-
-              <button
-                type="button"
-                className="clear-button"
-                onClick={clearFilters}
-              >
-                Clear Filters
-              </button>
-
-            </div>
-
-          </div>
+         <MovieFinder
+  mood={mood}
+  setMood={setMood}
+  genre={genre}
+  setGenre={setGenre}
+  rating={rating}
+  setRating={setRating}
+  language={language}
+  setLanguage={setLanguage}
+  yearFrom={yearFrom}
+  setYearFrom={setYearFrom}
+  yearTo={yearTo}
+  setYearTo={setYearTo}
+  findMovie={findMovie}
+  clearFilters={clearFilters}
+  discoverLoading={discoverLoading}
+  setExcludedMovies={setExcludedMovies}
+/>
 
           {/* FINDER ERROR */}
 
@@ -1074,259 +364,23 @@ function App() {
 
           {/* DISCOVER RESULT */}
 
-          {discoverMovie && (
-
-            <div
-              className="discover-result"
-              id="discover-result"
-            >
-
-              <div className="discover-poster">
-
-                {discoverMovie.poster_url ? (
-
-                  <img
-                    src={discoverMovie.poster_url}
-                    alt={discoverMovie.title}
-                    loading="eager"
-                    decoding="async"
-                  />
-
-                ) : (
-
-                  <div className="large-no-poster">
-                    🎬
-                  </div>
-
-                )}
-
-              </div>
-
-              <div className="discover-details">
-
-                <div className="picked-label">
-                  ✨ YOUR MOVIE
-                </div>
-
-                <h2>
-                  {discoverMovie.title}
-                </h2>
-
-                <div className="discover-meta">
-
-                  {discoverMovie.rating > 0 && (
-
-                    <span>
-                      ⭐{" "}
-                      {Number(
-                        discoverMovie.rating
-                      ).toFixed(1)}
-                    </span>
-
-                  )}
-
-                  {discoverMovie.year && (
-
-                    <span>
-                      📅 {discoverMovie.year}
-                    </span>
-
-                  )}
-
-                  {discoverMovie.runtime > 0 && (
-
-                    <span>
-                      ⏱ {discoverMovie.runtime} min
-                    </span>
-
-                  )}
-
-                </div>
-
-                {discoverMovie.genres && (
-
-                  <div className="discover-detail">
-
-                    <strong>
-                      🎭 Genres
-                    </strong>
-
-                    <span>
-                      {discoverMovie.genres}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {discoverMovie.language && (
-
-                  <div className="discover-detail">
-
-                    <strong>
-                      🌐 Language
-                    </strong>
-
-                    <span>
-                      {discoverMovie.language}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {discoverMovie.director && (
-
-                  <div className="discover-detail">
-
-                    <strong>
-                      🎬 Director
-                    </strong>
-
-                    <span>
-                      {discoverMovie.director}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {discoverMovie.cast && (
-
-                  <div className="discover-detail">
-
-                    <strong>
-                      👥 Cast
-                    </strong>
-
-                    <span>
-                      {discoverMovie.cast}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {discoverMovie.release_date && (
-
-                  <div className="discover-detail">
-
-                    <strong>
-                      📅 Release Date
-                    </strong>
-
-                    <span>
-                      {discoverMovie.release_date}
-                    </span>
-
-                  </div>
-
-                )}
-
-                {discoverMovie.overview && (
-
-                  <div className="discover-overview">
-
-                    <h3>
-                      Overview
-                    </h3>
-
-                    <p>
-                      {discoverMovie.overview}
-                    </p>
-
-                  </div>
-
-                )}
-
-                <button
-                  type="button"
-                  className="regenerate-button"
-                  onClick={() =>
-                    findMovie(true)
-                  }
-                  disabled={discoverLoading}
-                >
-
-                  🔄{" "}
-                  {discoverLoading
-                    ? "Finding..."
-                    : "Regenerate"}
-
-                </button>
-
-              </div>
-
-            </div>
-
-          )}
+          <DiscoverResult
+  discoverMovie={discoverMovie}
+  findMovie={findMovie}
+  discoverLoading={discoverLoading}
+/>
 
         </section>
 
-        {/* ==================================================
-            TOP RATED
-        ================================================== */}
+            {/* TOP RATED */}
 
-        <section
-          className="content-section top-rated-section"
-          id="top-rated"
-        >
-
-          <div className="section-heading">
-
-            <p>
-              POPULAR PICKS
-            </p>
-
-            <h2>
-              ⭐ Top Rated Movies
-            </h2>
-
-            <span>
-              Highly rated movies from our
-              collection
-            </span>
-
-          </div>
-
-          <div className="movie-grid">
-
-            {topRated.map((movie, index) => (
-
-              <MovieCard
-                key={movie.id}
-                movie={movie}
-                priority={index < 10}
-              />
-
-            ))}
-
-          </div>
-
-        </section>
+       <TopRatedMovies
+  topRated={topRated}
+  selectMovie={selectMovie}
+/>
 
       </main>
-
-      {/* ==================================================
-          FOOTER
-      ================================================== */}
-
-      <footer>
-
-        <div className="footer-logo">
-          🎬 MovieVerse
-        </div>
-
-        <p>
-          Discover. Explore. Enjoy.
-        </p>
-
-        <small>
-          MovieVerse • AI-Powered Movie
-          Recommendation System
-        </small>
-
-      </footer>
+     <Footer />
 
     </div>
   );
