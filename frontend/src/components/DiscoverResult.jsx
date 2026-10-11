@@ -1,5 +1,5 @@
 
-function DiscoverResult({
+function Discoverresult({
   discoverMovie,
   findMovie,
   discoverLoading,
@@ -98,4 +98,4 @@ function DiscoverResult({
   );
 }
 
-export default DiscoverResult;
+export default Discoverresult;

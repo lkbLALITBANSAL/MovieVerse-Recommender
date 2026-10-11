@@ -6,7 +6,7 @@ import RelatedMovies from "./components/Relatedmovies.jsx";
 import MovieFinder from "./components/MovieFinder.jsx";
 import TopRatedMovies from "./components/TopRatedMovies.jsx";
 import Footer from "./components/Footer.jsx";
-import DiscoverResult from "./components/DiscoverResult.jsx"
+import Discoverresult from "./components/Discoverresult.jsx"
 
 import {
   searchMovies,
@@ -320,7 +320,7 @@ function App() {
             </div>
           )}
 
-          <DiscoverResult
+          <Discoverresult
             discoverMovie={discoverMovie}
             findMovie={findMovie}
             discoverLoading={discoverLoading}
