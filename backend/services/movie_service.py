@@ -238,9 +238,7 @@ def movie_to_dict(row):
     }
 
 
-# ==================================================
 # FIND MOVIE INDEX
-# ==================================================
 
 def find_index(movie_id):
     if isinstance(movies, pd.DataFrame):
