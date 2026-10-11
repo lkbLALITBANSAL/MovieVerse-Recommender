@@ -12,7 +12,6 @@ import {
   searchMovies,
   getMovie,
   getRecommendations,
-  getTopRated,
   discoverMovies
 } from "./api";
 
@@ -39,9 +38,9 @@ function App() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState("");
 
-  // PRELOAD FIRST 10 TOP-RATED POSTERS
+  // PRELOAD TOP-RATED POSTERS
   function preloadImages(movies) {
-    movies.slice(0, 10).forEach(movie => {
+    movies.slice(0, 12).forEach((movie) => {
       if (movie?.poster_url) {
         const img = new Image();
         img.src = movie.poster_url;
@@ -49,14 +48,30 @@ function App() {
     });
   }
 
-  // LOAD TOP RATED MOVIES
-
+  // LOAD TOP-RATED MOVIES FROM LOCAL JSON
   useEffect(() => {
     loadTopRated();
   }, []);
 
-  // SEARCH SUGGESTIONS
+  async function loadTopRated() {
+    try {
+      const response = await fetch("/top_rated.json");
 
+      if (!response.ok) {
+        throw new Error("Unable to load top-rated movies JSON");
+      }
+
+      const data = await response.json();
+
+      setTopRated(Array.isArray(data) ? data : []);
+      preloadImages(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Top-rated movies loading error:", err);
+      setTopRated([]);
+    }
+  }
+
+  // SEARCH SUGGESTIONS
   useEffect(() => {
     const timer = setTimeout(() => {
       if (query.trim().length >= 1) {
@@ -78,23 +93,7 @@ function App() {
     }
   }
 
-  // LOAD TOP RATED
-
-  async function loadTopRated() {
-    try {
-      const data = await getTopRated(10);
-
-      setTopRated(data || []);
-
-      // Start downloading the first 10 posters immediately
-      preloadImages(data || []);
-    } catch {
-      setTopRated([]);
-    }
-  }
-
   // SELECT MOVIE
-
   async function selectMovie(movie) {
     setSuggestions([]);
     setQuery(movie.title);
@@ -124,7 +123,6 @@ function App() {
   }
 
   // SEARCH
-
   async function handleSearch(e) {
     e.preventDefault();
 
@@ -146,7 +144,6 @@ function App() {
   }
 
   // FIND MOVIE BY MOOD
-
   async function findMovie(regenerate = false) {
     setDiscoverLoading(true);
     setDiscoverError("");
@@ -171,8 +168,7 @@ function App() {
       }
 
       let available = result.filter(
-        movie =>
-          !excludedMovies.includes(String(movie.id))
+        (movie) => !excludedMovies.includes(String(movie.id))
       );
 
       if (available.length === 0) {
@@ -188,7 +184,7 @@ function App() {
 
       setDiscoverMovie(movie);
 
-      setExcludedMovies(prev => {
+      setExcludedMovies((prev) => {
         const id = String(movie.id);
 
         if (prev.includes(id)) {
@@ -218,7 +214,6 @@ function App() {
   }
 
   // CLEAR FILTERS
-
   function clearFilters() {
     setMood("");
     setGenre("");
@@ -232,7 +227,6 @@ function App() {
   }
 
   // SCROLL TO FINDER
-
   function scrollToFinder() {
     document
       .getElementById("movie-finder")
@@ -241,31 +235,20 @@ function App() {
       });
   }
 
-  
-
-
   // UI
-
   return (
     <div className="app">
-
-    <Navbar scrollToFinder={scrollToFinder} />
-     
+      <Navbar scrollToFinder={scrollToFinder} />
 
       <main>
-
-      <HeroSearch
-  query={query}
-  setQuery={setQuery}
-  suggestions={suggestions}
-  handleSearch={handleSearch}
-  selectMovie={selectMovie}
-  scrollToFinder={scrollToFinder}
-/>
-
-        
-           
-       
+        <HeroSearch
+          query={query}
+          setQuery={setQuery}
+          suggestions={suggestions}
+          handleSearch={handleSearch}
+          selectMovie={selectMovie}
+          scrollToFinder={scrollToFinder}
+        />
 
         {error && (
           <div className="error-message">
@@ -273,54 +256,35 @@ function App() {
           </div>
         )}
 
-        
-           {/* LOADING */}
-        
-
         {loading && (
           <div className="loading">
             Loading movie...
           </div>
         )}
 
-{/*         
-            MOVIE DETAILS
-         */}
-
         {selectedMovie && (
-  <MovieDetails selectedMovie={selectedMovie} />
-)}
+          <MovieDetails selectedMovie={selectedMovie} />
+        )}
 
-        
-            {/* RELATED MOVIES */}
-        
-
-       <RelatedMovies
-  selectedMovie={selectedMovie}
-  recommendations={recommendations}
-  selectMovie={selectMovie}
-/>
-
-            {/* MOVIE FINDER */}
+        <RelatedMovies
+          selectedMovie={selectedMovie}
+          recommendations={recommendations}
+          selectMovie={selectMovie}
+        />
 
         <section
           className="finder-section"
           id="movie-finder"
         >
-
           <div className="finder-header">
-
             <div>
-
               <p className="section-label">
                 MOVIE DISCOVERY
               </p>
 
               <h2>
                 🎭 Find a Movie
-                <span>
-                  {" "}for Your Mood
-                </span>
+                <span>{" "}for Your Mood</span>
               </h2>
 
               <p>
@@ -328,60 +292,48 @@ function App() {
                 for and we'll pick one movie
                 from our collection.
               </p>
-
             </div>
-
           </div>
 
-         <MovieFinder
-  mood={mood}
-  setMood={setMood}
-  genre={genre}
-  setGenre={setGenre}
-  rating={rating}
-  setRating={setRating}
-  language={language}
-  setLanguage={setLanguage}
-  yearFrom={yearFrom}
-  setYearFrom={setYearFrom}
-  yearTo={yearTo}
-  setYearTo={setYearTo}
-  findMovie={findMovie}
-  clearFilters={clearFilters}
-  discoverLoading={discoverLoading}
-  setExcludedMovies={setExcludedMovies}
-/>
-
-          {/* FINDER ERROR */}
+          <MovieFinder
+            mood={mood}
+            setMood={setMood}
+            genre={genre}
+            setGenre={setGenre}
+            rating={rating}
+            setRating={setRating}
+            language={language}
+            setLanguage={setLanguage}
+            yearFrom={yearFrom}
+            setYearFrom={setYearFrom}
+            yearTo={yearTo}
+            setYearTo={setYearTo}
+            findMovie={findMovie}
+            clearFilters={clearFilters}
+            discoverLoading={discoverLoading}
+            setExcludedMovies={setExcludedMovies}
+          />
 
           {discoverError && (
-
             <div className="discover-error">
               {discoverError}
             </div>
-
           )}
 
-          {/* DISCOVER RESULT */}
-
           <DiscoverResult
-  discoverMovie={discoverMovie}
-  findMovie={findMovie}
-  discoverLoading={discoverLoading}
-/>
-
+            discoverMovie={discoverMovie}
+            findMovie={findMovie}
+            discoverLoading={discoverLoading}
+          />
         </section>
 
-            {/* TOP RATED */}
-
-       <TopRatedMovies
-  topRated={topRated}
-  selectMovie={selectMovie}
-/>
-
+        <TopRatedMovies
+          topRated={topRated}
+          selectMovie={selectMovie}
+        />
       </main>
-     <Footer />
 
+      <Footer />
     </div>
   );
 }
