@@ -4,6 +4,7 @@ import pickle
 import requests
 import numpy as np
 import pandas as pd
+import json
 
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -594,6 +595,134 @@ def update_posters(
 
     return posters
 
+# precompute 12 top-rated movies
+
+def save_top_rated_json(movies_df, posters, count=20):
+    """Generate the 12 highest-rated English movies for the homepage."""
+
+    frontend_public_dir = os.path.join(
+        BASE_DIR, "frontend", "public"
+    )
+    os.makedirs(frontend_public_dir, exist_ok=True)
+
+    output_path = os.path.join(
+        frontend_public_dir, "top_rated.json"
+    )
+
+    if movies_df is None or movies_df.empty:
+        print("No movies available for top-rated JSON.")
+        return
+
+    def safe_value(value):
+        """Convert missing values and nested collections to JSON-safe values."""
+        if value is None:
+            return ""
+
+        if isinstance(value, (list, tuple, set)):
+            return [safe_value(item) for item in value]
+
+        try:
+            if pd.isna(value):
+                return ""
+        except (TypeError, ValueError):
+            pass
+
+        # Convert NumPy scalar types to ordinary Python values.
+        if isinstance(value, np.generic):
+            return safe_value(value.item())
+
+        return value
+
+    df = movies_df.copy()
+
+    # Match the backend's English-only top-rated selection.
+    df["language"] = df["language"].fillna("").astype(str)
+    df = df[df["language"].str.lower() == "en"]
+
+    df["rating"] = pd.to_numeric(
+        df["rating"], errors="coerce"
+    ).fillna(0)
+
+    df = df.sort_values(
+        by="rating", ascending=False
+    )
+
+    top_movies = []
+
+    for _, row in df.iterrows():
+        movie_id = row["id"]
+
+        poster_url = posters.get(movie_id)
+        if poster_url is None:
+            poster_url = posters.get(str(movie_id))
+
+        # Only include movies that have a poster.
+        if not isinstance(poster_url, str) or not poster_url.strip():
+            continue
+
+        release_date = safe_value(row.get("release_date", ""))
+        release_date = str(release_date) if release_date else ""
+
+        year_value = safe_value(row.get("year"))
+        year = None
+
+        if year_value != "":
+            try:
+                year = int(year_value)
+            except (TypeError, ValueError):
+                year = None
+
+        if year is None and len(release_date) >= 4:
+            try:
+                year = int(release_date[:4])
+            except ValueError:
+                pass
+
+        runtime_value = safe_value(row.get("runtime", 0))
+        try:
+            runtime = int(runtime_value or 0)
+        except (TypeError, ValueError):
+            runtime = 0
+
+        rating_value = safe_value(row.get("rating", 0))
+        try:
+            rating = float(rating_value or 0)
+        except (TypeError, ValueError):
+            rating = 0.0
+
+        movie = {
+            "id": int(movie_id),
+            "title": str(safe_value(row.get("title", ""))),
+            "overview": str(safe_value(row.get("overview", ""))),
+            "genres": safe_value(row.get("genres", [])),
+            "director": str(safe_value(row.get("director", ""))),
+            "language": str(safe_value(row.get("language", ""))),
+            "rating": rating,
+            "runtime": runtime,
+            "release_date": release_date,
+            "year": year,
+            "poster_url": poster_url.strip()
+        }
+
+        top_movies.append(movie)
+
+        if len(top_movies) >= count:
+            break
+
+    with open(output_path, "w", encoding="utf-8") as file:
+        json.dump(
+            top_movies,
+            file,
+            ensure_ascii=False,
+            indent=2,
+            allow_nan=False
+        )
+
+    print(
+        f"Saved {len(top_movies)} top-rated movies to "
+        f"{output_path}"
+    )
+
 
 def main():
 
@@ -647,6 +776,9 @@ def main():
         )
 
     old_movies = old_movies.copy()
+
+    # Generate the homepage JSON even if no new movies are found.
+    save_top_rated_json(old_movies, old_posters)
 
     print(
         f"\nExisting movies: "
@@ -969,6 +1101,9 @@ def main():
         POSTERS_PATH,
         cleaned_posters
     )
+
+    # Refresh homepage's top-rated movies after updating the dataset.
+    save_top_rated_json(combined_movies, cleaned_posters)
 
     print(
         "\n========================================"
