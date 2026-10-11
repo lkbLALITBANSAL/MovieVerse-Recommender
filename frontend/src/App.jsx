@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import Navbar from "./components/Navbar.jsx";
 import HeroSearch from "./components/Herosearch.jsx";
@@ -6,7 +7,7 @@ import RelatedMovies from "./components/Relatedmovies.jsx";
 import MovieFinder from "./components/MovieFinder.jsx";
 import TopRatedMovies from "./components/TopRatedMovies.jsx";
 import Footer from "./components/Footer.jsx";
-import Discoverresult from "./components/Discoverresult.jsx"
+import Discoverresult from "./components/Discoverresult.jsx";
 
 import {
   searchMovies,
@@ -62,9 +63,10 @@ function App() {
       }
 
       const data = await response.json();
+      const movies = Array.isArray(data) ? data : [];
 
-      setTopRated(Array.isArray(data) ? data : []);
-      preloadImages(Array.isArray(data) ? data : []);
+      setTopRated(movies);
+      preloadImages(movies);
     } catch (err) {
       console.error("Top-rated movies loading error:", err);
       setTopRated([]);
@@ -95,18 +97,39 @@ function App() {
 
   // SELECT MOVIE
   async function selectMovie(movie) {
+    if (!movie) return;
+
     setSuggestions([]);
     setQuery(movie.title);
-    setLoading(true);
     setError("");
 
-    try {
-      const details = await getMovie(movie.id);
-      const related = await getRecommendations(movie.id, 8);
+    // Check whether the movie exists in the local top-rated JSON
+    const localMovie = topRated.find(
+      (item) => String(item.id) === String(movie.id)
+    );
 
-      setSelectedMovie(details);
+    // Use local JSON details immediately when available
+    if (localMovie) {
+      setSelectedMovie(localMovie);
+    } else {
+      setLoading(true);
+    }
+
+    // Clear recommendations from the previously selected movie
+    setRecommendations([]);
+
+    try {
+      // Fetch movie details only when the movie is not in local JSON
+      if (!localMovie) {
+        const details = await getMovie(movie.id);
+        setSelectedMovie(details);
+      }
+
+      // Recommendations are still fetched from the backend
+      const related = await getRecommendations(movie.id, 8);
       setRecommendations(related || []);
 
+      // Scroll to the movie details section
       setTimeout(() => {
         document
           .getElementById("movie-details")
@@ -115,8 +138,14 @@ function App() {
             block: "start"
           });
       }, 100);
-    } catch {
-      setError("Unable to load movie details.");
+    } catch (err) {
+      console.error("Movie selection error:", err);
+
+      setError(
+        localMovie
+          ? "Movie details loaded, but recommendations could not be loaded."
+          : "Unable to load movie details or recommendations."
+      );
     } finally {
       setLoading(false);
     }
