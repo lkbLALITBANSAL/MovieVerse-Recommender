@@ -95,41 +95,46 @@ function App() {
     }
   }
 
-  // SELECT MOVIE
-  async function selectMovie(movie) {
-    if (!movie) return;
 
-    setSuggestions([]);
-    setQuery(movie.title);
-    setError("");
+ 
+// SELECT MOVIE
+async function selectMovie(movie) {
+  if (!movie) return;
 
-    // Check whether the movie exists in the local top-rated JSON
-    const localMovie = topRated.find(
-      (item) => String(item.id) === String(movie.id)
-    );
+  setSuggestions([]);
+  setQuery(movie.title);
+  setError("");
 
-    // Use local JSON details immediately when available
-    if (localMovie) {
-      setSelectedMovie(localMovie);
-    } else {
-      setLoading(true);
-    }
+  const localMovie = topRated.find(
+    (item) => String(item.id) === String(movie.id)
+  );
 
-    // Clear recommendations from the previously selected movie
-    setRecommendations([]);
+  setRecommendations([]);
 
-    try {
-      // Fetch movie details only when the movie is not in local JSON
-      if (!localMovie) {
-        const details = await getMovie(movie.id);
-        setSelectedMovie(details);
-      }
+  if (localMovie) {
+    // Display local movie details immediately
+    setSelectedMovie(localMovie);
+    setLoading(false);
 
-      // Recommendations are still fetched from the backend
-      const related = await getRecommendations(movie.id, 8);
-      setRecommendations(related || []);
+    // Scroll up to movie details immediately
+    setTimeout(() => {
+      document
+        .getElementById("movie-details")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+    }, 100);
+  } else {
+    setLoading(true);
+  }
 
-      // Scroll to the movie details section
+  try {
+    // Fetch details only for movies not in local JSON
+    if (!localMovie) {
+      const details = await getMovie(movie.id);
+      setSelectedMovie(details);
+
       setTimeout(() => {
         document
           .getElementById("movie-details")
@@ -138,18 +143,24 @@ function App() {
             block: "start"
           });
       }, 100);
-    } catch (err) {
-      console.error("Movie selection error:", err);
-
-      setError(
-        localMovie
-          ? "Movie details loaded, but recommendations could not be loaded."
-          : "Unable to load movie details or recommendations."
-      );
-    } finally {
-      setLoading(false);
     }
+
+    // Recommendations continue loading from the backend
+    const related = await getRecommendations(movie.id, 8);
+    setRecommendations(related || []);
+  } catch (err) {
+    console.error("Movie selection error:", err);
+
+    setError(
+      localMovie
+        ? "Movie details loaded, but recommendations could not be loaded."
+        : "Unable to load movie details or recommendations."
+    );
+  } finally {
+    setLoading(false);
   }
+}
+
 
   // SEARCH
   async function handleSearch(e) {
