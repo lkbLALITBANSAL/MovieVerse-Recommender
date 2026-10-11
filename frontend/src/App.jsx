@@ -4,9 +4,9 @@ import HeroSearch from "./components/Herosearch.jsx";
 import MovieDetails from "./components/Moviedetails.jsx";
 import RelatedMovies from "./components/Relatedmovies.jsx";
 import MovieFinder from "./components/MovieFinder.jsx";
-import DiscoverResult from "./components/Discoverresult.jsx";
 import TopRatedMovies from "./components/TopRatedMovies.jsx";
 import Footer from "./components/Footer.jsx";
+import DiscoverResult from "./components/DiscoverResult.jsx"
 
 import {
   searchMovies,
